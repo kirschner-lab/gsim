@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+			     http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.scijava</groupId>
+    <artifactId>pom-scijava</artifactId>
+    <version>12.0.0</version>
+    <relativePath />
+  </parent>
+
+  <groupId>edu.umich.med.micro.malthus</groupId>
+  <artifactId>gsim</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+
+  <name>gsim</name>
+  <description>Export GranSim agents and grids as images</description>
+  <url>https://github.com/kirschner-lab/gsim</url>
+  <inceptionYear>2024</inceptionYear>
+  <organization>
+    <name>Denise Kirschner Laboratory</name>
+    <url>http://malthus.micro.med.umich.edu</url>
+  </organization>
+  <licenses>
+    <license>
+      <name>CC0 1.0 Universal License</name>
+      <url>http://creativecommons.org/publicdomain/zero/1.0/</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>omsai</id>
+      <name>Pariksheet Nanda</name>
+      <url>https://imagej.net/people/omsai</url>
+      <roles>
+        <!-- see https://imagej.net/Team -->
+        <role>founder</role>
+        <role>lead</role>
+        <role>developer</role>
+        <role>debugger</role>
+        <role>reviewer</role>
+        <role>support</role>
+        <role>maintainer</role>
+      </roles>
+    </developer>
+  </developers>
+  <contributors>
+    <contributor>
+      <name>None</name>
+    </contributor>
+  </contributors>
+
+  <mailingLists>
+    <mailingList>
+      <name>Image.sc Forum</name>
+      <archive>https://forum.image.sc/</archive>
+    </mailingList>
+  </mailingLists>
+
+  <scm>
+    <connection>scm:git:git://github.com/kirschner-lab/gsim</connection>
+    <developerConnection>scm:git:git@github.com:kirschner-lab/gsim</developerConnection>
+    <tag>HEAD</tag>
+    <url>https://github.com/kirschner-lab/gsim</url>
+  </scm>
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>http://github.com/kirschner-lab/gsim/issues</url>
+  </issueManagement>
+  <ciManagement>
+    <system>None</system>
+  </ciManagement>
+
+  <properties>
+    <main-class>main</main-class>
+    <package-name>gsim</package-name>
+    <license.licenseName>cc0</license.licenseName>
+    <license.copyrightOwners>N/A</license.copyrightOwners>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>scijava.public</id>
+      <url>https://maven.scijava.org/content/groups/public</url>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <!-- ImageJ dependencies -->
+    <dependency>
+      <groupId>net.imagej</groupId>
+      <artifactId>imagej</artifactId>
+    </dependency>
+
+    <!-- SQLite dependencies -->
+    <dependency>
+      <groupId>org.xerial</groupId>
+      <artifactId>sqlite-jdbc</artifactId>
+    </dependency>
+
+    <!-- Test dependencies -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+  <dependencyManagement>
+  	<dependencies>
+  		<dependency>
+  			<groupId>org.xerial</groupId>
+  			<artifactId>sqlite-jdbc</artifactId>
+  			<version>3.45.3.0</version>
+  		</dependency>
+  	</dependencies>
+  </dependencyManagement>
+</project>
