@@ -9,10 +9,16 @@ import net.imglib2.RandomAccess;
 import net.imglib2.img.Img;
 import net.imglib2.type.numeric.real.DoubleType;
 import org.scijava.command.Command;
+import org.scijava.io.IOService;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
+import org.scijava.table.GenericTable;
 import org.scijava.ui.UIService;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -20,6 +26,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 
 /**
  * This ImageJ {@link Command} plugin exports GranSim output as images.
@@ -39,10 +46,25 @@ import java.util.List;
 @Plugin(type = Command.class, menuPath = "Plugins>GranSim Image Export")
 public class GranSimImageExport implements Command {
     @Parameter
+    private IOService ioService;
+
+    @Parameter
     private UIService uiService;
 
     @Parameter
     private OpService opService;
+
+    private GenericTable expStateTable() {
+    	GenericTable expState = null;
+    	try {
+            expState =
+                (GenericTable)
+                ioService.open("/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/exp_state.csv");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return expState;
+    }
 
     private ImgPlus<DoubleType> allocateImgPlus() {
         // Allocate the multi-channel image.
@@ -75,16 +97,14 @@ public class GranSimImageExport implements Command {
              Statement statement = connection.createStatement();
              )
             {
-
                 // Agents.
-                System.out.println("Reading the first image for time "
-                                   + time + "...");
                 final RandomAccess<DoubleType> ra = imp.randomAccess();
                 for (int channel = 0;
                      channel < agents.size();
                      ++channel) {
                     System.out.println("Read channel "
                                        + agents.get(channel) + "...");
+                    System.out.flush();
                     String query = "select x_pos, y_pos from agents where "
                         + "time = " + time + " and "
                         + "exp = " + exp + " and "
@@ -92,6 +112,7 @@ public class GranSimImageExport implements Command {
                     ResultSet rs = statement.executeQuery(query);
                     System.out.println("Writing channel "
                                        + agents.get(channel) + "...");
+                    System.out.flush();
                     ra.setPosition(channel, channelDim);
                     while (rs.next()) {
                         int x = rs.getInt("x_pos");
@@ -104,11 +125,13 @@ public class GranSimImageExport implements Command {
 
                 // Grid TNF.
                 System.out.println("Read grid tnf...");
+                System.out.flush();
                 String query = "select i, j, x from tnf where "
                     + "time = " + time + " and "
                     + "exp = " + exp + ";";
                 ResultSet rs = statement.executeQuery(query);
                 System.out.println("Writing grid tnf...");
+                System.out.flush();
                 ra.setPosition(6, channelDim);
                 while (rs.next()) {
                     int i = rs.getInt("i");
@@ -121,11 +144,13 @@ public class GranSimImageExport implements Command {
 
                 // Grid IFN-gamma.
                 System.out.println("Read grid ifn-g ...");
+                System.out.flush();
                 query = "select i, j, x from ifng where "
                     + "time = " + time + " and "
                     + "exp = " + exp + ";";
                 rs = statement.executeQuery(query);
                 System.out.println("Writing grid ifn-g...");
+                System.out.flush();
                 ra.setPosition(7, channelDim);
                 while (rs.next()) {
                     int i = rs.getInt("i");
@@ -143,9 +168,44 @@ public class GranSimImageExport implements Command {
 
     @Override
     public void run() {
-        ImgPlus<DoubleType> imp = allocateImgPlus();
-        fillImgPlus(imp, 1);
-        uiService.show(imp);
+    	GenericTable expState = expStateTable();
+    	//uiService.show(expState);
+    	Path dir = Paths.get("/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/img");
+    	if (Files.notExists(dir)) {
+            try {
+                Files.createDirectory(dir);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+    	}
+    	int nRows = expState.getRowCount();
+    	for (int row : IntStream.range(0, nRows).toArray()) {
+            int exp = -1;
+            try {
+                exp = ((Double) expState.get("exp", row)).intValue();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            System.out.println(
+                               row + ": Reading image for exp "
+                               + exp + "...");
+            System.out.flush();
+            ImgPlus<DoubleType> imp = allocateImgPlus();
+            fillImgPlus(imp, exp);
+            //uiService.show(imp);
+            String state = (String) expState.get("state", row);
+            Path fileTif = Paths.get(
+                                     dir.toString(),
+                                     "exp" + exp + "_" + state + ".tif");
+            try {
+                ioService.save(imp, fileTif.toString());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.out.println(row + ": Saved " + fileTif);
+            System.out.flush();
+            imp = null;
+    	}
     }
 
     /**
