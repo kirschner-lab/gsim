@@ -14,12 +14,11 @@ import org.scijava.plugin.Plugin;
 import org.scijava.ui.UIService;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -45,8 +44,7 @@ public class GranSimImageExport implements Command {
     @Parameter
     private OpService opService;
 
-    @Override
-    public void run() {
+    private ImgPlus<DoubleType> allocateImgPlus() {
         // Allocate the multi-channel image.
         int dim = 300;
         int ch = 8;
@@ -58,54 +56,40 @@ public class GranSimImageExport implements Command {
         final String[] units = { "um", "um" };
         ImgPlus<DoubleType> imp =
             new ImgPlus<DoubleType>(img, "GranSim", axes, cal, units);
+        return imp;
+    }
+
+    private void fillImgPlus(ImgPlus<DoubleType> imp, int exp) {
+        final int time = 11952;
+        final int channelDim = 2;
+        final List<String> agents =
+            Arrays.asList("mac",
+                          "myofib",
+                          "fib",
+                          "t_gam",
+                          "t_cyt",
+                          "t_reg");
 
         // Connect to the database.
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:/Users/pnanda/immunology/GR-ABM-ODE/simulation/scripts/calibration/mibi/gs_dumps.db");
              Statement statement = connection.createStatement();
              )
             {
-                DatabaseMetaData metadata = connection.getMetaData();
-                ResultSet rs = metadata.getTables(null, null, "%", null);
-                List<String> tables = new ArrayList<>();
-                while (rs.next()) {
-                    tables.add(rs.getString(3));
-                }
-                System.out.println("Tables in database: " + tables);
-
-                // Collect the first image.
-                statement.setQueryTimeout(30); // seconds
-                String query = "select distinct time from agents;";
-                rs = statement.executeQuery(query);
-                List<Integer> times = new ArrayList<>();
-                while (rs.next()) {
-                    times.add(rs.getInt("time"));
-                }
-                System.out.println("Timepoints: " + times);
-
-                query = "select distinct agent_type from agents;";
-                rs = statement.executeQuery(query);
-                List<String> agents = new ArrayList<>();
-                while (rs.next()) {
-                    agents.add(rs.getString("agent_type"));
-                }
-                System.out.println("Agents: " + agents);
 
                 // Agents.
-                Integer time = times.get(times.size() - 1);
                 System.out.println("Reading the first image for time "
                                    + time + "...");
-                int channelDim = 2;
                 final RandomAccess<DoubleType> ra = imp.randomAccess();
                 for (int channel = 0;
                      channel < agents.size();
                      ++channel) {
                     System.out.println("Read channel "
                                        + agents.get(channel) + "...");
-                    query = "select x_pos, y_pos from agents where "
+                    String query = "select x_pos, y_pos from agents where "
                         + "time = " + time + " and "
-                        + "exp = 1 and "
+                        + "exp = " + exp + " and "
                         + "agent_type = '" + agents.get(channel) + "';";
-                    rs = statement.executeQuery(query);
+                    ResultSet rs = statement.executeQuery(query);
                     System.out.println("Writing channel "
                                        + agents.get(channel) + "...");
                     ra.setPosition(channel, channelDim);
@@ -120,10 +104,10 @@ public class GranSimImageExport implements Command {
 
                 // Grid TNF.
                 System.out.println("Read grid tnf...");
-                query = "select i, j, x from tnf where "
+                String query = "select i, j, x from tnf where "
                     + "time = " + time + " and "
-                    + "exp = 1;";
-                rs = statement.executeQuery(query);
+                    + "exp = " + exp + ";";
+                ResultSet rs = statement.executeQuery(query);
                 System.out.println("Writing grid tnf...");
                 ra.setPosition(6, channelDim);
                 while (rs.next()) {
@@ -139,7 +123,7 @@ public class GranSimImageExport implements Command {
                 System.out.println("Read grid ifn-g ...");
                 query = "select i, j, x from ifng where "
                     + "time = " + time + " and "
-                    + "exp = 1;";
+                    + "exp = " + exp + ";";
                 rs = statement.executeQuery(query);
                 System.out.println("Writing grid ifn-g...");
                 ra.setPosition(7, channelDim);
@@ -155,7 +139,12 @@ public class GranSimImageExport implements Command {
         catch (SQLException e) {
             e.printStackTrace();
         }
+    }
 
+    @Override
+    public void run() {
+        ImgPlus<DoubleType> imp = allocateImgPlus();
+        fillImgPlus(imp, 1);
         uiService.show(imp);
     }
 
