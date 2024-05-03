@@ -7,7 +7,8 @@ import net.imagej.axis.AxisType;
 import net.imagej.ops.OpService;
 import net.imglib2.RandomAccess;
 import net.imglib2.img.Img;
-import net.imglib2.type.numeric.real.DoubleType;
+import net.imglib2.img.array.ArrayImgFactory;
+import net.imglib2.type.numeric.real.FloatType;
 import org.scijava.command.Command;
 import org.scijava.io.IOService;
 import org.scijava.plugin.Parameter;
@@ -66,22 +67,22 @@ public class GranSimImageExport implements Command {
         return expState;
     }
 
-    private ImgPlus<DoubleType> allocateImgPlus() {
+    private ImgPlus<FloatType> allocateImgPlus() {
         // Allocate the multi-channel image.
         int dim = 300;
         int ch = 8;
-        Img<DoubleType> img =
-            opService.create().img(new long[] { dim, dim, ch });
+        Img<FloatType> img =
+            new ArrayImgFactory<>(new FloatType()).create(dim, dim, ch);
         // Add metadata using ImgPlus.
         final AxisType[] axes = { Axes.X, Axes.Y, Axes.CHANNEL };
         final double[] cal = { 20, 20 };
         final String[] units = { "um", "um" };
-        ImgPlus<DoubleType> imp =
-            new ImgPlus<DoubleType>(img, "GranSim", axes, cal, units);
+        ImgPlus<FloatType> imp =
+            new ImgPlus<FloatType>(img, "GranSim", axes, cal, units);
         return imp;
     }
 
-    private void fillImgPlus(ImgPlus<DoubleType> imp, int exp) {
+    private void fillImgPlus(ImgPlus<FloatType> imp, int exp) {
         final int time = 11952;
         final int channelDim = 2;
         final List<String> agents =
@@ -98,7 +99,7 @@ public class GranSimImageExport implements Command {
              )
             {
                 // Agents.
-                final RandomAccess<DoubleType> ra = imp.randomAccess();
+                final RandomAccess<FloatType> ra = imp.randomAccess();
                 for (int channel = 0;
                      channel < agents.size();
                      ++channel) {
@@ -136,7 +137,7 @@ public class GranSimImageExport implements Command {
                 while (rs.next()) {
                     int i = rs.getInt("i");
                     int j = rs.getInt("j");
-                    double x = rs.getDouble("x");
+                    float x = rs.getFloat("x");
                     ra.setPosition(i, 0);
                     ra.setPosition(j, 1);
                     ra.get().set(x);
@@ -155,7 +156,7 @@ public class GranSimImageExport implements Command {
                 while (rs.next()) {
                     int i = rs.getInt("i");
                     int j = rs.getInt("j");
-                    double x = rs.getDouble("x");
+                    float x = rs.getFloat("x");
                     ra.setPosition(i, 0);
                     ra.setPosition(j, 1);
                     ra.get().set(x);
@@ -170,7 +171,7 @@ public class GranSimImageExport implements Command {
     public void run() {
     	GenericTable expState = expStateTable();
     	//uiService.show(expState);
-    	Path dir = Paths.get("/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/img");
+    	Path dir = Paths.get("/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/img-float");
     	if (Files.notExists(dir)) {
             try {
                 Files.createDirectory(dir);
@@ -190,7 +191,7 @@ public class GranSimImageExport implements Command {
                                row + ": Reading image for exp "
                                + exp + "...");
             System.out.flush();
-            ImgPlus<DoubleType> imp = allocateImgPlus();
+            ImgPlus<FloatType> imp = allocateImgPlus();
             fillImgPlus(imp, exp);
             //uiService.show(imp);
             String state = (String) expState.get("state", row);
