@@ -8,7 +8,9 @@ import net.imagej.ops.OpService;
 import net.imglib2.RandomAccess;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
+import net.imglib2.type.numeric.integer.ShortType;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.view.IntervalView;
 import org.scijava.command.Command;
 import org.scijava.io.IOService;
 import org.scijava.plugin.Parameter;
@@ -43,123 +45,131 @@ import java.util.stream.IntStream;
  * </p>
  *
  * @author Pariksheet Nanda
+ * @param <T>
  */
 @Plugin(type = Command.class, menuPath = "Plugins>GranSim Image Export")
 public class GranSimImageExport implements Command {
+    // Constants.
+    final private String dirModelRun =
+        "/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/";
+    final private String dirOutput = dirModelRun + "img";
+    final private String fileExpStateTable = dirModelRun + "exp_state.csv";
+    final private String fileDb =
+        "/Users/pnanda/immunology/GR-ABM-ODE/simulation/scripts/calibration/"
+        + "mibi/gs_dumps.db";
+
+    // Members.
+    private ImgPlus<ShortType> _agents = null;
+    private Img<FloatType> _grids = null;
+    private final List<String> _agent_names =
+        Arrays.asList("mac",
+                      "myofib",
+                      "fib",
+                      "t_gam",
+                      "t_cyt",
+                      "t_reg");
+    private final List<String> _grid_names =
+        Arrays.asList("tnf",
+                      "ifng");
+
+    // Services.
     @Parameter
     private IOService ioService;
-
     @Parameter
     private UIService uiService;
-
     @Parameter
     private OpService opService;
 
     private GenericTable expStateTable() {
     	GenericTable expState = null;
     	try {
-            expState =
-                (GenericTable)
-                ioService.open("/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/exp_state.csv");
+            expState = (GenericTable) ioService.open(fileExpStateTable);
         } catch (IOException e) {
             e.printStackTrace();
         }
         return expState;
     }
 
-    private ImgPlus<FloatType> allocateImgPlus() {
-        // Allocate the multi-channel image.
+    private void reAllocateImgPlus() {
+    	// Clear any previous allocations.
+        _agents = null;
+        _grids = null;
+        // Metadata for ImgPlus.
         int dim = 300;
-        int ch = 8;
-        Img<FloatType> img =
-            new ArrayImgFactory<>(new FloatType()).create(dim, dim, ch);
-        // Add metadata using ImgPlus.
         final AxisType[] axes = { Axes.X, Axes.Y, Axes.CHANNEL };
         final double[] cal = { 20, 20 };
         final String[] units = { "um", "um" };
-        ImgPlus<FloatType> imp =
-            new ImgPlus<FloatType>(img, "GranSim", axes, cal, units);
-        return imp;
+        // Allocate the multi-channel images.
+        Img<ShortType> agents =
+            new ArrayImgFactory<>(new ShortType())
+            .create(dim, dim, _agent_names.size());
+        _agents = new ImgPlus<ShortType>(agents, "GranSim", axes, cal, units);
+        Img<FloatType> grids =
+            new ArrayImgFactory<>(new FloatType())
+            .create(dim, dim, _grid_names.size());
+        _grids = new ImgPlus<FloatType>(grids, "GranSim", axes, cal, units);
     }
 
-    private void fillImgPlus(ImgPlus<FloatType> imp, int exp) {
+    private void fillImgPlus(int exp) {
         final int time = 11952;
         final int channelDim = 2;
-        final List<String> agents =
-            Arrays.asList("mac",
-                          "myofib",
-                          "fib",
-                          "t_gam",
-                          "t_cyt",
-                          "t_reg");
 
         // Connect to the database.
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:/Users/pnanda/immunology/GR-ABM-ODE/simulation/scripts/calibration/mibi/gs_dumps.db");
-             Statement statement = connection.createStatement();
+        try (Connection connection =
+             DriverManager.getConnection("jdbc:sqlite:" + fileDb);
+             Statement statement =
+             connection.createStatement();
              )
             {
                 // Agents.
-                final RandomAccess<FloatType> ra = imp.randomAccess();
+                final RandomAccess<ShortType> ra_b = _agents.randomAccess();
                 for (int channel = 0;
-                     channel < agents.size();
+                     channel < _agent_names.size();
                      ++channel) {
-                    System.out.println("Read channel "
-                                       + agents.get(channel) + "...");
+                    String agent_name = _agent_names.get(channel);
+                    System.out.println("Reading agent " + agent_name + "...");
                     System.out.flush();
                     String query = "select x_pos, y_pos from agents where "
                         + "time = " + time + " and "
                         + "exp = " + exp + " and "
-                        + "agent_type = '" + agents.get(channel) + "';";
+                        + "agent_type = '" + agent_name + "';";
                     ResultSet rs = statement.executeQuery(query);
-                    System.out.println("Writing channel "
-                                       + agents.get(channel) + "...");
+                    System.out.println("Writing agent " + agent_name + "...");
                     System.out.flush();
-                    ra.setPosition(channel, channelDim);
+                    ra_b.setPosition(channel, channelDim);
                     while (rs.next()) {
                         int x = rs.getInt("x_pos");
                         int y = rs.getInt("y_pos");
-                        ra.setPosition(x, 0);
-                        ra.setPosition(y, 1);
-                        ra.get().set(1);
+                        ra_b.setPosition(x, 0);
+                        ra_b.setPosition(y, 1);
+                        ra_b.get().set((short) 1);
                     }
                 }
 
-                // Grid TNF.
-                System.out.println("Read grid tnf...");
-                System.out.flush();
-                String query = "select i, j, x from tnf where "
-                    + "time = " + time + " and "
-                    + "exp = " + exp + ";";
-                ResultSet rs = statement.executeQuery(query);
-                System.out.println("Writing grid tnf...");
-                System.out.flush();
-                ra.setPosition(6, channelDim);
-                while (rs.next()) {
-                    int i = rs.getInt("i");
-                    int j = rs.getInt("j");
-                    float x = rs.getFloat("x");
-                    ra.setPosition(i, 0);
-                    ra.setPosition(j, 1);
-                    ra.get().set(x);
-                }
-
-                // Grid IFN-gamma.
-                System.out.println("Read grid ifn-g ...");
-                System.out.flush();
-                query = "select i, j, x from ifng where "
-                    + "time = " + time + " and "
-                    + "exp = " + exp + ";";
-                rs = statement.executeQuery(query);
-                System.out.println("Writing grid ifn-g...");
-                System.out.flush();
-                ra.setPosition(7, channelDim);
-                while (rs.next()) {
-                    int i = rs.getInt("i");
-                    int j = rs.getInt("j");
-                    float x = rs.getFloat("x");
-                    ra.setPosition(i, 0);
-                    ra.setPosition(j, 1);
-                    ra.get().set(x);
+                // Grids.
+                final RandomAccess<FloatType> ra_f = _grids.randomAccess();
+                for (int channel = 0;
+                     channel < _grid_names.size();
+                     ++channel) {
+                    String grid_name = _grid_names.get(channel);
+                    System.out.println("Reading grid " + grid_name + "...");
+                    System.out.flush();
+                    String query = "select i, j, x from "
+                        + grid_name + " where "
+                        + "time = " + time + " and "
+                        + "exp = " + exp + ";";
+                    ResultSet rs = statement.executeQuery(query);
+                    System.out.println("Writing grid " + grid_name + "...");
+                    System.out.flush();
+                    ra_f.setPosition(channel, channelDim);
+                    while (rs.next()) {
+                        int i = rs.getInt("i");
+                        int j = rs.getInt("j");
+                        float x = rs.getFloat("x");
+                        ra_f.setPosition(i, 0);
+                        ra_f.setPosition(j, 1);
+                        ra_f.get().set(x);
+                    }
                 }
             }
         catch (SQLException e) {
@@ -169,44 +179,74 @@ public class GranSimImageExport implements Command {
 
     @Override
     public void run() {
-    	GenericTable expState = expStateTable();
-    	//uiService.show(expState);
-    	Path dir = Paths.get("/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/img-float");
-    	if (Files.notExists(dir)) {
+        GenericTable expState = expStateTable();
+        //uiService.show(expState);
+        Path dir = Paths.get(dirOutput);
+        if (Files.notExists(dir)) {
             try {
                 Files.createDirectory(dir);
             } catch (IOException e) {
                 e.printStackTrace();
             }
-    	}
-    	int nRows = expState.getRowCount();
-    	for (int row : IntStream.range(0, nRows).toArray()) {
+        }
+        int nRows = expState.getRowCount();
+        for (int row : IntStream.range(0, nRows).toArray()) {
             int exp = -1;
             try {
                 exp = ((Double) expState.get("exp", row)).intValue();
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            System.out.println(
-                               row + ": Reading image for exp "
+            System.out.println(row + ": Reading image for exp "
                                + exp + "...");
             System.out.flush();
-            ImgPlus<FloatType> imp = allocateImgPlus();
-            fillImgPlus(imp, exp);
+            reAllocateImgPlus();
+            fillImgPlus(exp);
             //uiService.show(imp);
             String state = (String) expState.get("state", row);
-            Path fileTif = Paths.get(
-                                     dir.toString(),
-                                     "exp" + exp + "_" + state + ".tif");
-            try {
-                ioService.save(imp, fileTif.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
+            int channelOffset = 1;
+            final int channelDim = 2;
+            final String format = "exp_%04d_state_%s_channel_%02d_%s.tif";
+            for (int channel = 0;
+                 channel < _agent_names.size();
+                 ++channel) {
+                String agent_name = _agent_names.get(channel);
+                String fileTif =
+                    String.format(format, exp, state, channelOffset + channel,
+                                  agent_name);
+                String pathTif = Paths.get(dir.toString(), fileTif).toString();
+                IntervalView<ShortType> imp =
+                    opService.transform()
+                    .hyperSliceView(_agents, channelDim, channel);
+                try {
+                    ioService.save(imp, pathTif);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(row + ": Saved " + fileTif);
+                System.out.flush();
             }
-            System.out.println(row + ": Saved " + fileTif);
-            System.out.flush();
-            imp = null;
-    	}
+            channelOffset += _agent_names.size();
+            for (int channel = 0;
+                 channel < _grid_names.size();
+                 ++channel) {
+                String grid_name = _grid_names.get(channel);
+                String fileTif =
+                    String.format(format, exp, state, channelOffset + channel,
+                                  grid_name);
+                String pathTif = Paths.get(dir.toString(), fileTif).toString();
+                IntervalView<FloatType> imp =
+                    opService.transform()
+                    .hyperSliceView(_grids, channelDim, channel);
+                try {
+                    ioService.save(imp, pathTif);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(row + ": Saved " + fileTif);
+                System.out.flush();
+            }
+        }
     }
 
     /**
