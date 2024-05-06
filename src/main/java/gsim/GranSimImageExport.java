@@ -1,5 +1,6 @@
 package gsim;
 
+import io.scif.img.ImgSaver;
 import net.imagej.ImageJ;
 import net.imagej.ImgPlus;
 import net.imagej.axis.Axes;
@@ -171,7 +172,7 @@ public class GranSimImageExport implements Command {
     public void run() {
     	GenericTable expState = expStateTable();
     	//uiService.show(expState);
-    	Path dir = Paths.get("/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/img-float");
+    	Path dir = Paths.get("/Users/pnanda/modelruns/2024-03-04-A-gs-without-tgfb/img-ome");
     	if (Files.notExists(dir)) {
             try {
                 Files.createDirectory(dir);
@@ -198,6 +199,21 @@ public class GranSimImageExport implements Command {
             Path fileTif = Paths.get(
                                      dir.toString(),
                                      "exp" + exp + "_" + state + ".tif");
+
+            ImgSaver saver = new ImgSaver();
+
+            // // Export raw pixels as OME TIFF.
+            // // https://bio-formats.readthedocs.io/en/stable/developers/export2.html
+            // ServiceFactory factory = new ServiceFactory();
+            // OMEXMLService service = factory.getInstance(OMEXMLService.class);
+            // IMetadata omexml = service.createOMEXMLMetadata();
+
+            // // Populate the metadata.
+            // omexml.setImageID("Image:0", 0);
+            // omexml.setPixelsID("Pixels:0", 0);
+            // omexml.setPixelsBinDataBigEndian(Boolean.TRUE, 0, 0);
+            // omexml.setPixelsDimensionOrder(DimensionOrder.XYCZT, 0);
+            // omexml.setPixelsType(PixelType.UINT16, 0);
             try {
                 ioService.save(imp, fileTif.toString());
             } catch (IOException e) {
