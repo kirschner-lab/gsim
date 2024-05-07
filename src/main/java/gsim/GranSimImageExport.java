@@ -8,7 +8,7 @@ import net.imagej.ops.OpService;
 import net.imglib2.RandomAccess;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
-import net.imglib2.type.numeric.integer.ShortType;
+import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.IntervalView;
 import org.scijava.command.Command;
@@ -59,7 +59,7 @@ public class GranSimImageExport implements Command {
         + "mibi/gs_dumps.db";
 
     // Members.
-    private ImgPlus<ShortType> _agents = null;
+    private ImgPlus<IntType> _agents = null;
     private Img<FloatType> _grids = null;
     private final List<String> _agent_names =
         Arrays.asList("mac",
@@ -100,10 +100,10 @@ public class GranSimImageExport implements Command {
         final double[] cal = { 20, 20 };
         final String[] units = { "um", "um" };
         // Allocate the multi-channel images.
-        Img<ShortType> agents =
-            new ArrayImgFactory<>(new ShortType())
+        Img<IntType> agents =
+            new ArrayImgFactory<>(new IntType())
             .create(dim, dim, _agent_names.size());
-        _agents = new ImgPlus<ShortType>(agents, "GranSim", axes, cal, units);
+        _agents = new ImgPlus<IntType>(agents, "GranSim", axes, cal, units);
         Img<FloatType> grids =
             new ArrayImgFactory<>(new FloatType())
             .create(dim, dim, _grid_names.size());
@@ -122,7 +122,7 @@ public class GranSimImageExport implements Command {
              )
             {
                 // Agents.
-                final RandomAccess<ShortType> ra_b = _agents.randomAccess();
+                final RandomAccess<IntType> ra_b = _agents.randomAccess();
                 for (int channel = 0;
                      channel < _agent_names.size();
                      ++channel) {
@@ -137,12 +137,14 @@ public class GranSimImageExport implements Command {
                     System.out.println("Writing agent " + agent_name + "...");
                     System.out.flush();
                     ra_b.setPosition(channel, channelDim);
+                    int object = 1;
                     while (rs.next()) {
                         int x = rs.getInt("x_pos");
                         int y = rs.getInt("y_pos");
                         ra_b.setPosition(x, 0);
                         ra_b.setPosition(y, 1);
-                        ra_b.get().set((short) 1);
+                        ra_b.get().set(object);
+                        object += 1;
                     }
                 }
 
@@ -215,7 +217,7 @@ public class GranSimImageExport implements Command {
                     String.format(format, exp, state, channelOffset + channel,
                                   agent_name);
                 String pathTif = Paths.get(dir.toString(), fileTif).toString();
-                IntervalView<ShortType> imp =
+                IntervalView<IntType> imp =
                     opService.transform()
                     .hyperSliceView(_agents, channelDim, channel);
                 try {
